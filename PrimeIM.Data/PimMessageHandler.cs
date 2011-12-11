@@ -75,7 +75,7 @@ namespace PrimeIM.Data
 
             foreach (var item in RosterReserve)
             {
-                var buddyPresences = PresenceReserve.Where(p => p.From.Bare.ToLower() == item.Jid.Bare.ToLower());
+                var buddyPresences = PresenceReserve.Where(p => p.From.Bare.ToLower() == item.Jid.Bare.ToLower()).ToList();
 
                 if (buddyPresences.Count() == 0)
                     continue;
@@ -83,8 +83,8 @@ namespace PrimeIM.Data
                 roster.Add(new Buddy(buddyPresences, item));
             }
 
-            var newBuddies = roster.Where(r => !BuddyList.Instance.Contains(r.RosterItem)).ToList();
-            var updateBuddies = PresenceReserve.Except(roster.SelectMany(b => b.Presences));
+            var newBuddies = roster.Where(r => !BuddyList.Instance.Contains(r.RosterItem.Jid)).ToList();
+            var updateBuddies = PresenceReserve.Except(roster.SelectMany(b => b.Presences)).ToList();
             BuddyList.Instance.AddRange(newBuddies);
             BuddyList.Instance.UpdateRange(updateBuddies);
         }

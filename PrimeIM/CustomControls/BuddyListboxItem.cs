@@ -16,9 +16,9 @@ namespace PrimeIM.CustomControls
 
         private readonly Presence Presence;
 
-        public BuddyListboxItem(Presence presence)
+        public BuddyListboxItem(Buddy buddy)
         {
-            this.Presence = presence;
+            this.Presence = buddy.MainPresence;
             InitializeComponent();
             UpdateBuddyInformation();
         }

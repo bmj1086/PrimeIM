@@ -64,6 +64,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Buddy.cs" />
+    <Compile Include="BuddyListChangedAction.cs" />
+    <Compile Include="BuddyListChangedEventHandlerArgs.cs" />
     <Compile Include="Comparers\BuddyComparer.cs" />
     <Compile Include="BuddyList.cs" />
     <Compile Include="BuddyListEventArgs.cs" />

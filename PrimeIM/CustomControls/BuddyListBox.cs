@@ -1,6 +1,5 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Specialized;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
@@ -22,10 +21,10 @@ namespace PrimeIM.CustomControls
         public BuddyListBox()
         {
             InitializeComponent();
-            BuddyList.Instance.CollectionChanged += BuddyListChanged;
+            BuddyList.Instance.BuddyListChanged += BuddyListChanged;
         }
 
-        private void BuddyListChanged(object sender, NotifyCollectionChangedEventArgs args)
+        private void BuddyListChanged(object sender, BuddyListChangedEventHandlerArgs args)
         {
             lock (thisLock)
             {
@@ -34,31 +33,33 @@ namespace PrimeIM.CustomControls
                 else
                     RemoveEmptyItems();
 
-                Action<Presence> action = null;
-                IList items = args.NewItems;
+                Action<IList<Buddy>> action = null;
                 switch (args.Action)
                 {
-                    case NotifyCollectionChangedAction.Add:
+                    case BuddyListChangedAction.Add:
                         action = Add;
                         break;
-                    case NotifyCollectionChangedAction.Move:
-                        throw new NotImplementedException();
-                    case NotifyCollectionChangedAction.Reset:
-                        UpdateAllControls();
-                        break;
-                    case NotifyCollectionChangedAction.Replace:
+                    case BuddyListChangedAction.Update:
                         action = Update;
                         break;
-                    case NotifyCollectionChangedAction.Remove:
+                    case BuddyListChangedAction.Remove:
+                        action = Remove;
                         break;
                 }
 
                 if (action != null)
                 {
-                    foreach (var item in items)
-                        Invoke(action, (item as Buddy).MainPresence);
+                    Invoke(action, args.ChangedBuddies);
                 }
 
+            }
+        }
+
+        private void Remove(IList<Buddy> buddies)
+        {
+            foreach (BuddyListboxItem existingItem in buddies.Select(GetItem).Where(item => item != null))
+            {
+                Controls.Remove(existingItem);
             }
         }
 
@@ -87,44 +88,52 @@ namespace PrimeIM.CustomControls
             Sort();
         }
 
-        private void Update(Presence presence)
+        private void Update(IList<Buddy> buddies)
         {
-            var existingBuddyItem = flowLayoutPanel.Controls.OfType<BuddyListboxItem>().
-                Where(b => b.Buddy.Equals(presence)).
-                SingleOrDefault();
+            SuspendLayout();
+            foreach (var buddy in buddies)
+            {
+                var existingBuddyItem = GetItem(buddy);
 
-            if (existingBuddyItem == null)
-                return;
+                if (existingBuddyItem == null)
+                    return;
 
-            existingBuddyItem.UpdateBuddyInformation();
+                existingBuddyItem.UpdateBuddyInformation(); 
+            }
+            ResumeLayout(true);
             Sort();
         }
 
         [Browsable(true)]
         public event BuddyDoubleClickedHandler BuddyDoubleClicked;
 
-        public void Add(Presence presence)
+        public void Add(IList<Buddy> items)
         {
-            if (GetItem(presence) != null)
+            SuspendLayout();
+            foreach (var buddy in items)
+            {
+                if (GetItem(buddy) != null)
                     return;
 
-            var item = new BuddyListboxItem(presence);
+                var item = new BuddyListboxItem(buddy);
 
-            item.MouseDoubleClick += ItemMouseDoubleClick;
-            AddItem(item);
+                item.MouseDoubleClick += ItemMouseDoubleClick;
+                flowLayoutPanel.Controls.Add(item);
+            }
+            ResumeLayout(true);
+            Sort();
         }
 
-        private BuddyListboxItem GetItem(Presence presence)
+        private BuddyListboxItem GetItem(Buddy buddy)
         {
             return flowLayoutPanel.Controls.OfType<BuddyListboxItem>().
-                Where(b => b.Buddy.MainPresence.Equals(presence)).
+                Where(b => b.Equals(buddy)).
                 SingleOrDefault();
         }
 
         private void AddItem(BuddyListboxItem item)
         {
-            flowLayoutPanel.Controls.Add(item);
-            Sort();
+            
         }
 
         private void ItemMouseDoubleClick(object sender, MouseEventArgs e)
