@@ -4,28 +4,29 @@ using System.Windows.Forms;
 using agsXMPP.protocol.client;
 using agsXMPP.protocol.iq.avatar;
 using PrimeIM.Data;
+using agsXMPP.protocol.iq.roster;
 
 namespace PrimeIM.CustomControls
 {
     public partial class BuddyListboxItem : UserControl
     {
+        private readonly RosterItem RosterItem;
+
         public Buddy Buddy
         {
-            get { return BuddyList.Instance.Get(Presence); }
+            get { return BuddyList.Instance.Get(this.RosterItem.Jid); }
         }
-
-        private readonly Presence Presence;
 
         public BuddyListboxItem(Buddy buddy)
         {
-            this.Presence = buddy.MainPresence;
+            this.RosterItem = buddy.RosterItem;
             InitializeComponent();
             UpdateBuddyInformation();
         }
 
         public void UpdateBuddyInformation()
         {
-            buddyNameLabel.Text = Buddy.Name;
+            buddyNameLabel.Text = RosterItem.Name;
             buddyStatusLabel.Text = String.IsNullOrEmpty(Buddy.Status) ? Buddy.ShowTypeString : Buddy.Status;
             buddyStatusPictureBox.BackColor = ConvertBuddyStatusToColor();
             //buddyPictureBox.Image = ImageFromAvatar(Buddy.Avatar);

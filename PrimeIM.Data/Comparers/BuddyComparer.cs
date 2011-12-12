@@ -21,12 +21,17 @@ namespace PrimeIM.Data.Comparers
                 return 1; // greater than
             if (xInt < yInt)
                 return -1; // less than
+            if (x.Name == y.Name)
+                return 1; // if nicknames are the same need to return > so the hashset allows adding
             return x.Name.CompareTo(y.Name);
 
         }
 
         private int GetShowTypeInt(Buddy buddy)
         {
+            if (buddy.MainPresence == null)
+                return 5;
+
             switch (buddy.MainPresenceType)
             {
                 case ShowType.chat:

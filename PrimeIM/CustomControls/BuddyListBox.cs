@@ -28,11 +28,7 @@ namespace PrimeIM.CustomControls
         {
             lock (thisLock)
             {
-                if (InvokeRequired)
-                    Invoke(new Action(RemoveEmptyItems));
-                else
-                    RemoveEmptyItems();
-
+                SuspendLayout();
                 Action<IList<Buddy>> action = null;
                 switch (args.Action)
                 {
@@ -47,61 +43,42 @@ namespace PrimeIM.CustomControls
                         break;
                 }
 
-                if (action != null)
-                {
-                    Invoke(action, args.ChangedBuddies);
-                }
-
+                if (action == null)
+                    throw new NotImplementedException(args.Action + " is not implemented for BuddyListBox.");
+ 
+                Invoke(action, args.ChangedBuddies);
+                ResumeLayout(false);
+                Invoke(new Action(Sort));
             }
         }
 
         private void Remove(IList<Buddy> buddies)
         {
-            foreach (BuddyListboxItem existingItem in buddies.Select(GetItem).Where(item => item != null))
+            foreach (BuddyListboxItem existingItem in buddies.Select(GetItem))
             {
-                Controls.Remove(existingItem);
+                flowLayoutPanel.Controls.Remove(existingItem);
             }
-        }
-
-        private void UpdateAllControls()
-        {
-            foreach (var control in flowLayoutPanel.Controls.OfType<BuddyListboxItem>())
-            {    
-                if (InvokeRequired)
-                    Invoke(new Action(() => control.UpdateBuddyInformation()));
-                else
-                    control.UpdateBuddyInformation();
-            
-            }
-            Sort();
-        }
-
-        private void RemoveEmptyItems()
-        {
-            var cleanupControls = flowLayoutPanel.Controls.OfType<BuddyListboxItem>().
-                Where(b => b.Buddy == null);
-
-            foreach (var buddyListboxItem in cleanupControls)
-            {
-                flowLayoutPanel.Controls.Remove(buddyListboxItem);
-            }
-            Sort();
         }
 
         private void Update(IList<Buddy> buddies)
         {
-            SuspendLayout();
+            List<Buddy> adds = new List<Buddy>();
             foreach (var buddy in buddies)
             {
                 var existingBuddyItem = GetItem(buddy);
 
                 if (existingBuddyItem == null)
-                    return;
+                {
+                    adds.Add(buddy);
+                    continue;
+                }
 
                 existingBuddyItem.UpdateBuddyInformation(); 
             }
-            ResumeLayout(true);
-            Sort();
+
+            if (adds.Count > 0)
+                Add(adds);
+            
         }
 
         [Browsable(true)]
@@ -109,10 +86,9 @@ namespace PrimeIM.CustomControls
 
         public void Add(IList<Buddy> items)
         {
-            SuspendLayout();
             foreach (var buddy in items)
             {
-                if (GetItem(buddy) != null)
+                if (GetItem(buddy) != null || !buddy.IsOnline)
                     return;
 
                 var item = new BuddyListboxItem(buddy);
@@ -120,20 +96,14 @@ namespace PrimeIM.CustomControls
                 item.MouseDoubleClick += ItemMouseDoubleClick;
                 flowLayoutPanel.Controls.Add(item);
             }
-            ResumeLayout(true);
-            Sort();
         }
 
         private BuddyListboxItem GetItem(Buddy buddy)
         {
-            return flowLayoutPanel.Controls.OfType<BuddyListboxItem>().
-                Where(b => b.Equals(buddy)).
+            var rtn = flowLayoutPanel.Controls.OfType<BuddyListboxItem>().
+                Where(b => b.Buddy == buddy).
                 SingleOrDefault();
-        }
-
-        private void AddItem(BuddyListboxItem item)
-        {
-            
+            return rtn;
         }
 
         private void ItemMouseDoubleClick(object sender, MouseEventArgs e)
@@ -151,11 +121,12 @@ namespace PrimeIM.CustomControls
         
         private void Sort()
         {
-            var items =
-                flowLayoutPanel.Controls.OfType<BuddyListboxItem>().OrderBy(x => x.Buddy).
-                    ToArray();
+            var items = flowLayoutPanel.Controls.OfType<BuddyListboxItem>().
+                OrderBy(x => x.Buddy).ToArray();
+
             flowLayoutPanel.Controls.Clear();
             flowLayoutPanel.Controls.AddRange(items);
+            Invalidate();
         }
     }
 }

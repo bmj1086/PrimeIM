@@ -13,7 +13,8 @@ namespace PrimeIM.Data
 
         public static readonly BuddyList Instance = new BuddyList();
         private bool notificationDelayed;
-        private readonly HashSet<Presence> PresenceReserve = new HashSet<Presence>();
+        private readonly HashSet<RosterItem> RosterItems = new HashSet<RosterItem>();
+        private readonly HashSet<Presence> PresenceContainer = new HashSet<Presence>();
 
         private BuddyList() : base(BuddyComparer.Instance)
         {
@@ -30,11 +31,8 @@ namespace PrimeIM.Data
             
             DelayNotification(false);
 
-            if (!notificationDelayed && BuddyListChanged != null)
-            {
-                BuddyListChanged.Invoke(this,
+            BuddyListChanged.Invoke(this,
                     new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Add, buddies.ToList()));
-            }
         }
 
         private void DelayNotification(bool delay)
@@ -44,18 +42,22 @@ namespace PrimeIM.Data
 
         private new void Add(Buddy item)
         {
-            base.Add(item);
-
-            if (!notificationDelayed && BuddyListChanged != null)
+            lock (this)
             {
-                BuddyListChanged.Invoke(this,
-                    new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Add, new[] { item }));
+                base.Add(item);
+
+                if (!notificationDelayed && BuddyListChanged != null)
+                {
+                    BuddyListChanged.Invoke(this,
+                        new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Add, new[] { item }));
+                } 
             }
         }
 
         public void Add(RosterItem item)
         {
-            var presences = PresenceReserve.Where(p => p.From.Bare.ToLower() == item.Jid.Bare.ToLower());
+            RosterItems.Add(item);
+            var presences = PresenceContainer.Where(p => p.From.Bare.ToLower() == item.Jid.Bare.ToLower());
             Add(new Buddy(presences, item));
         }
 
@@ -73,24 +75,38 @@ namespace PrimeIM.Data
                 }
                 else
                 {
-                    PresenceReserve.Add(presence);
+                    var rosterItem = RosterItems.Where(r => r.Jid.Bare.ToLower() == presence.From.Bare.ToLower()).SingleOrDefault();
+                    if (rosterItem == null)
+                    {
+                        lock (this)
+                        {
+                            PresenceContainer.Add(presence);
+                        }
+                    }
+                    else
+                    {
+                        Add(rosterItem);
+                    }
                 }
             }
         }
 
         public void Update(Presence presence)
         {
-            var buddy = Get(presence.From);
-            
-            if (buddy == null)
-                return;
-
-            buddy.UpdateInfo(presence);
-
-            if (!notificationDelayed && BuddyListChanged != null)
+            lock (this)
             {
-                BuddyListChanged.Invoke(this,
-                    new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Update, new[] { buddy }));
+                var buddy = Get(presence.From);
+
+                if (buddy == null)
+                    return;
+
+                buddy.UpdateInfo(presence);
+
+                if (!notificationDelayed && BuddyListChanged != null)
+                {
+                    BuddyListChanged.Invoke(this,
+                        new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Update, new[] { buddy }));
+                } 
             }
         }
 
@@ -114,34 +130,37 @@ namespace PrimeIM.Data
 
         public void Remove(Presence presence)
         {
-            var buddy = Get(presence);
-            
-            if (buddy == null)
-                return;
-            
-            buddy.RemovePresence(presence);
+            lock (this)
+            {
+                var buddy = Get(presence);
 
-            if (buddy.IsOnline)
-            {
-                BuddyListChanged.Invoke(this,
-                    new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Update, new[] { buddy }));
-            }
-            else
-            {
-                Remove(buddy);
-                if (notificationDelayed || BuddyListChanged != null) return;
-                BuddyListChanged.Invoke(this,
-                    new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Remove, new[] { buddy }));
+                if (buddy == null)
+                    return;
+
+                buddy.RemovePresence(presence);
+
+                if (buddy.IsOnline)
+                {
+                    BuddyListChanged.Invoke(this,
+                        new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Update, new[] { buddy }));
+                }
+                else
+                {
+                    Remove(buddy);
+                } 
             }
         }
 
         public new void Remove(Buddy item)
         {
-            base.Remove(item);
-            if (!notificationDelayed && BuddyListChanged != null)
+            lock (this)
             {
-                BuddyListChanged.Invoke(this,
-                    new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Remove, new[] {item}));
+                base.Remove(item);
+                if (!notificationDelayed && BuddyListChanged != null)
+                {
+                    BuddyListChanged.Invoke(this,
+                        new BuddyListChangedEventHandlerArgs(BuddyListChangedAction.Remove, new[] { item }));
+                } 
             }
         }
 

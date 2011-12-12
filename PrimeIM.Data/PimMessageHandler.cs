@@ -24,7 +24,6 @@ namespace PrimeIM.Data
         private static readonly XmppClientConnection XmppClientSingleton = new XmppClientConnection();
         private static HashSet<RosterItem> RosterReserve = new HashSet<RosterItem>(RosterItemComparer.Instance);
         private static HashSet<Presence> PresenceReserve = new HashSet<Presence>(PresenceComparer.Instance);
-        private static bool startup = true;
 
         public static bool Authenticated
         {
@@ -59,34 +58,6 @@ namespace PrimeIM.Data
             XmppClientSingleton.OnError += XmppClientSingletonOnError;
             XmppClientSingleton.OnLogin += PresenceChanged;
             XmppClientSingleton.OnClose += PresenceChanged;
-            XmppClientSingleton.OnRosterEnd += XmppClientSingleton_OnRosterEnd;
-        }
-
-        static void XmppClientSingleton_OnRosterEnd(object sender)
-        {
-            Action action = CreateBuddyList;
-            action.InvokeLater(3000);
-        }
-
-        private static void CreateBuddyList()
-        {
-            startup = false;
-            HashSet<Buddy> roster = new HashSet<Buddy>(BuddyComparer.Instance);
-
-            foreach (var item in RosterReserve)
-            {
-                var buddyPresences = PresenceReserve.Where(p => p.From.Bare.ToLower() == item.Jid.Bare.ToLower()).ToList();
-
-                if (buddyPresences.Count() == 0)
-                    continue;
-
-                roster.Add(new Buddy(buddyPresences, item));
-            }
-
-            var newBuddies = roster.Where(r => !BuddyList.Instance.Contains(r.RosterItem.Jid)).ToList();
-            var updateBuddies = PresenceReserve.Except(roster.SelectMany(b => b.Presences)).ToList();
-            BuddyList.Instance.AddRange(newBuddies);
-            BuddyList.Instance.UpdateRange(updateBuddies);
         }
 
         static void XmppClient_RosterItemReceived(object sender, RosterItem item)
@@ -94,7 +65,7 @@ namespace PrimeIM.Data
             if (item.Subscription != SubscriptionType.both)
                 return;
 
-            RosterReserve.Add(item);
+            BuddyList.Instance.Add(item);
         }
 
         static void PresenceChanged(object sender)
@@ -104,22 +75,12 @@ namespace PrimeIM.Data
         
         static void XmppClientSingletonOnError(object sender, Exception ex)
         {
-            throw new Exception(ex.ToString());
+            throw new Exception("An error occured in agsXMPP.", ex);
         }
 
         private static void XmppClientSingleton_OnPresence(object sender, Presence presence)
         {
-            if (presence.Type == PresenceType.unavailable)
-            {
-                BuddyList.Instance.Remove(presence);
-            }
-            else if (presence.Type == PresenceType.available)
-            {
-                if (startup)
-                    PresenceReserve.Add(presence);
-                else
-                    BuddyList.Instance.UpdateRange(new[] {presence});
-            }
+            BuddyList.Instance.HandlePresence(presence);
         }
 
         public static void SendMessage(Buddy buddy, string messageBody, string resource, string thread)

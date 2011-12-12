@@ -236,7 +236,7 @@ namespace PrimeIM
         {
             Chatstate state = messageTextBox.TextLength == 0 ? Chatstate.inactive : Chatstate.composing;
             var currentTab = GetCurrentTab();
-            currentTab.Buddy.SendChatState(state, currentTab.Resource, currentTab.CurrentThread);
+            PimMessageHandler.SendChatState(state, currentTab.Buddy, currentTab.Resource, currentTab.CurrentThread);
         }
 
         private void ChatForm_FormClosing(object sender, FormClosingEventArgs e)
